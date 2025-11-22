@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Party House - Deckbuilder Game</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Main Menu -->
+    <div id="main-menu" class="screen active">
+        <div class="menu-container">
+            <h1>Party House</h1>
+            <p class="subtitle">Deckbuilder Game</p>
+            <div id="win-streak-display" style="margin: 15px 0; font-size: 1.1em; color: #667eea; font-weight: bold;">
+                Win Streak: <span id="win-streak-count">0</span>
+            </div>
+            <button id="start-game-btn" class="menu-btn">Start Game</button>
+            <button id="instructions-btn" class="menu-btn">Instructions</button>
+        </div>
+    </div>
+
+    <!-- Instructions Screen -->
+    <div id="instructions-screen" class="screen">
+        <div class="menu-container">
+            <h2>Instructions</h2>
+            <div class="instructions-content">
+                <p><strong>Objective:</strong> Host a party with 4 star guests within 25 rounds!</p>
+                <p><strong>Party Phase:</strong> Press the door button to invite guests. Watch out for trouble - 3 troubles ends the party!</p>
+                <p><strong>Shop Phase:</strong> Use popularity to buy new guests. Use cash to upgrade house capacity.</p>
+                <p><strong>Win Condition:</strong> Host a party with 4 star guests before round 25!</p>
+            </div>
+            <button id="back-to-menu-btn" class="menu-btn">Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="screen">
+        <!-- Game Header -->
+        <div class="game-header">
+            <div class="stats">
+                <div class="stat">
+                    <span class="stat-label">Round:</span>
+                    <span id="round-display">1 / 25</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Popularity:</span>
+                    <span id="popularity-display">0</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Cash:</span>
+                    <span id="cash-display">0</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Capacity:</span>
+                    <span id="capacity-display">5</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Stars:</span>
+                    <span id="stars-display">0 / 4</span>
+                </div>
+            </div>
+            <button id="end-game-btn" class="control-btn">End Game</button>
+        </div>
+
+        <!-- Party Phase -->
+        <div id="party-phase" class="phase active">
+            <div class="phase-header">
+                <h2>Party Phase</h2>
+                <button id="end-round-btn" class="control-btn">End Round</button>
+            </div>
+            
+            <div class="game-content">
+                <div class="house-section">
+                    <h3>House (<span id="current-guests-count">0</span> / <span id="max-capacity-display">5</span>)</h3>
+                    <div id="house-guests" class="guests-container">
+                        <!-- Guests will be added here -->
+                    </div>
+                    <div class="trouble-warning">
+                        <span id="trouble-count">0</span> / 3 Troubles
+                    </div>
+                </div>
+
+                <div class="door-section">
+                    <button id="door-button" class="door-btn">🎪 Open Door</button>
+                    <p class="hint">Click to invite a random guest!</p>
+                </div>
+
+                <div class="guest-list-section">
+                    <h3>Guest List</h3>
+                    <div id="guest-list" class="guests-container">
+                        <!-- Available guests will be shown here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Shop Phase -->
+        <div id="shop-phase" class="phase">
+            <div class="phase-header">
+                <h2>Shop Phase</h2>
+                <button id="next-round-btn" class="control-btn">Next Round</button>
+            </div>
+
+            <div class="shop-content">
+                <div class="shop-section">
+                    <h3>Buy Guests (Popularity)</h3>
+                    <div id="shop-guests" class="shop-items">
+                        <!-- Shop items will be added here -->
+                    </div>
+                </div>
+
+                <div class="upgrade-section">
+                    <h3>Upgrade House (Cash)</h3>
+                    <div id="capacity-upgrade" class="upgrade-item">
+                        <p>Increase House Capacity</p>
+                        <p class="cost">Cost: <span id="capacity-cost">10</span> Cash</p>
+                        <button id="upgrade-capacity-btn" class="shop-btn">Upgrade</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="game-over-screen" class="overlay">
+            <div class="overlay-content">
+                <h2 id="game-over-title">Game Over</h2>
+                <p id="game-over-message"></p>
+                <button id="restart-game-btn" class="menu-btn">Play Again</button>
+                <button id="main-menu-btn" class="menu-btn">Main Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/game.js"></script>
+</body>
+</html>
+
