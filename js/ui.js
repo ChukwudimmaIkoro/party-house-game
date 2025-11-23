@@ -130,22 +130,84 @@ export class UIController {
     }
 
     showPhase(phaseName) {
-        this.elements.partyPhase.classList.remove('active');
-        this.elements.shopPhase.classList.remove('active');
+        // Smooth phase transition with wipe fade
+        const currentPhase = this.elements.partyPhase.classList.contains('active') ? 'party' : 
+                            this.elements.shopPhase.classList.contains('active') ? 'shop' : null;
         
-        if (phaseName === 'party') {
-            this.elements.partyPhase.classList.add('active');
-        } else if (phaseName === 'shop') {
-            this.elements.shopPhase.classList.add('active');
+        if (currentPhase === phaseName) return;
+        
+        // Create or get transition overlay
+        let overlay = document.getElementById('phase-transition-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'phase-transition-overlay';
+            overlay.className = 'phase-transition-overlay';
+            document.body.appendChild(overlay);
         }
+        
+        // Start wipe animation
+        overlay.classList.add('wiping');
+        
+        // Halfway through animation, switch phases
+        setTimeout(() => {
+            // Remove old phase
+            this.elements.partyPhase.classList.remove('active');
+            this.elements.shopPhase.classList.remove('active');
+            
+            // Add new phase
+            if (phaseName === 'party') {
+                this.elements.partyPhase.classList.add('active');
+            } else if (phaseName === 'shop') {
+                this.elements.shopPhase.classList.add('active');
+            }
+        }, 600); // Switch at midpoint (1.2s / 2 = 0.6s)
+        
+        // Remove overlay after animation completes
+        setTimeout(() => {
+            overlay.classList.remove('wiping');
+            // Reset for next transition
+            setTimeout(() => {
+                overlay.style.transform = 'translateX(-100%)';
+            }, 100);
+        }, 1200);
     }
 
     updateGameStats(gameState) {
+        // Update stat values without animation (only animate on specific changes)
         this.elements.roundDisplay.textContent = `${gameState.currentRound} / ${gameState.maxRounds}`;
         this.elements.popularityDisplay.textContent = gameState.popularity;
         this.elements.cashDisplay.textContent = gameState.cash;
         this.elements.capacityDisplay.textContent = gameState.houseCapacity;
         this.elements.starsDisplay.textContent = `${gameState.starCount} / 4`;
+    }
+    
+    // Animate a specific stat when it changes
+    animateSpecificStat(statName, newValue) {
+        let element;
+        switch(statName) {
+            case 'popularity':
+                element = this.elements.popularityDisplay;
+                break;
+            case 'cash':
+                element = this.elements.cashDisplay;
+                break;
+            case 'capacity':
+                element = this.elements.capacityDisplay;
+                break;
+            case 'stars':
+                element = this.elements.starsDisplay;
+                break;
+            default:
+                return;
+        }
+        
+        if (element && element.textContent !== String(newValue)) {
+            element.style.animation = 'none';
+            setTimeout(() => {
+                element.textContent = newValue;
+                element.style.animation = 'numberPop 0.2s ease-out';
+            }, 10);
+        }
     }
 
     updateHouseGuests(guests, gameState = null) {
@@ -227,9 +289,10 @@ export class UIController {
     }
 
     updateShop(shopGuests, gameState) {
+        // Always update shop to refresh button states (popularity/cash may have changed)
         this.elements.shopGuests.innerHTML = '';
         
-        shopGuests.forEach(guestKey => {
+        shopGuests.forEach((guestKey) => {
             const shopItem = this.createShopItem(guestKey, gameState);
             if (shopItem) {
                 this.elements.shopGuests.appendChild(shopItem);
@@ -238,7 +301,17 @@ export class UIController {
         
         // Update capacity upgrade cost
         this.elements.capacityCost.textContent = gameState.getCapacityUpgradeCost();
-        this.elements.upgradeCapacityBtn.disabled = gameState.cash < gameState.getCapacityUpgradeCost();
+        const canUpgrade = gameState.cash >= gameState.getCapacityUpgradeCost() && gameState.houseCapacity < 35;
+        const wasDisabled = this.elements.upgradeCapacityBtn.disabled;
+        this.elements.upgradeCapacityBtn.disabled = !canUpgrade;
+        
+        // Add shake if button becomes disabled
+        if (!canUpgrade && !wasDisabled) {
+            this.elements.upgradeCapacityBtn.classList.add('shake-once');
+            setTimeout(() => {
+                this.elements.upgradeCapacityBtn.classList.remove('shake-once');
+            }, 500);
+        }
     }
 
     createGuestCard(guest, clickable = false, gameState = null) {
@@ -267,10 +340,13 @@ export class UIController {
             stats.appendChild(pop);
         }
         
-        if (guest.cash > 0) {
+        if (guest.cash !== 0) {
             const cash = document.createElement('div');
             cash.className = 'guest-stat';
             cash.textContent = `💰 ${guest.cash} Cash`;
+            if (guest.cash < 0) {
+                cash.style.color = '#dc3545';
+            }
             stats.appendChild(cash);
         }
         
@@ -356,6 +432,38 @@ export class UIController {
                         }
                     });
                     abilitiesContainer.appendChild(inviteBtn);
+                } else if (ability.type === 'peek') {
+                    // Watchdog - Peek button
+                    // Ensure guest has instanceId (should be set when added to house)
+                    if (!guest.instanceId) {
+                        // Fallback: create instanceId if missing (shouldn't happen, but safety check)
+                        guest.instanceId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                    }
+                    
+                    // Check if this specific instance has used the ability
+                    const hasUsed = gameState.hasInstanceUsedAbility(guest.instanceId, 'peek');
+                    
+                    const peekBtn = document.createElement('button');
+                    peekBtn.className = 'ability-btn';
+                    peekBtn.textContent = 'Peek';
+                    peekBtn.style.fontSize = '0.8em';
+                    peekBtn.style.padding = '5px 10px';
+                    
+                    // Disable button if already used
+                    if (hasUsed) {
+                        peekBtn.disabled = true;
+                        peekBtn.style.opacity = '0.5';
+                        peekBtn.style.cursor = 'not-allowed';
+                    } else {
+                        peekBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            if (this.onUsePeek) {
+                                this.onUsePeek(guest.instanceId);
+                            }
+                        });
+                    }
+                    
+                    abilitiesContainer.appendChild(peekBtn);
                 }
             });
             
@@ -373,6 +481,7 @@ export class UIController {
         
         const item = document.createElement('div');
         item.className = 'shop-item';
+        item.dataset.guestKey = guestKey;
         
         const name = document.createElement('div');
         name.className = 'shop-item-name';
@@ -382,9 +491,10 @@ export class UIController {
         stats.className = 'shop-item-stats';
         
         // Build stats HTML
+        const cashValue = guestDef.cash || 0;
         let statsHTML = `
             <div>⭐ ${guestDef.popularity || 0} Pop</div>
-            <div>💰 ${guestDef.cash || 0} Cash</div>
+            <div${cashValue < 0 ? ' style="color: #dc3545;"' : ''}>💰 ${cashValue} Cash</div>
             ${guestDef.trouble > 0 ? `<div>⚠️ ${guestDef.trouble} Trouble</div>` : ''}
             ${guestDef.star > 0 ? `<div>✨ ${guestDef.star} Star</div>` : ''}
         `;
@@ -400,6 +510,12 @@ export class UIController {
                     statsHTML += `<div style="color: #dc3545;">👢 Kick (Remove a guest)</div>`;
                 } else if (ability.type === 'manualInvite') {
                     statsHTML += `<div style="color: #ffc107;">🚗 Invite (Select guest from pool)</div>`;
+                } else if (ability.type === 'peek') {
+                    statsHTML += `<div style="color: #17a2b8;">👁️ Peek (View next guest)</div>`;
+                } else if (ability.type === 'dancerSynergy') {
+                    statsHTML += `<div style="color: #e91e63;">💃 Pop: +Number of Dancers²</div>`;
+                } else if (ability.type === 'comedianSynergy') {
+                    statsHTML += `<div style="color: #e91e63;">😂 +5 Pop if house is full</div>`;
                 }
             });
         }
@@ -429,8 +545,21 @@ export class UIController {
         buyBtn.textContent = 'Buy';
         const canPurchase = gameState.canPurchaseGuest(guestKey);
         buyBtn.disabled = gameState.popularity < guestDef.cost || !canPurchase;
-        buyBtn.addEventListener('click', () => {
+        
+        // Add click handler - only works if button is enabled
+        buyBtn.addEventListener('click', (e) => {
+            // Prevent action if button is disabled
+            if (buyBtn.disabled) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            
             if (this.onBuyGuest) {
+                buyBtn.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    buyBtn.style.transform = '';
+                }, 150);
                 this.onBuyGuest(guestKey);
             }
         });
@@ -445,19 +574,23 @@ export class UIController {
     }
 
     updateDoorButton(enabled) {
+        const wasDisabled = this.elements.doorButton.disabled;
         this.elements.doorButton.disabled = !enabled;
+        
+        // Add shake animation if button becomes disabled
+        if (!enabled && !wasDisabled) {
+            this.elements.doorButton.classList.add('shake-once');
+            setTimeout(() => {
+                this.elements.doorButton.classList.remove('shake-once');
+            }, 500);
+        }
+    }
+    
+    updateDoorButtonText(text) {
+        if (this.elements.doorButton) {
+            this.elements.doorButton.textContent = text;
+        }
     }
 
-    showGameOver(won, message) {
-        if (won) {
-            this.elements.gameOverTitle.textContent = 'You Win!';
-            this.elements.gameOverTitle.style.color = '#28a745';
-        } else {
-            this.elements.gameOverTitle.textContent = 'Game Over';
-            this.elements.gameOverTitle.style.color = '#dc3545';
-        }
-        this.elements.gameOverMessage.textContent = message;
-        this.showScreen('gameOver');
-    }
 }
 

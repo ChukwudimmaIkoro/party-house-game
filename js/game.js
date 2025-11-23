@@ -4,7 +4,7 @@
 
 import { GameState } from './gameState.js';
 import { UIController } from './ui.js';
-import { createGuest } from './guest.js';
+import { createGuest, GuestDefinitions } from './guest.js';
 
 class Game {
     constructor() {
@@ -62,6 +62,10 @@ class Game {
             this.useInviteAbility(guestId);
         };
 
+        this.ui.onUsePeek = (guestId) => {
+            this.usePeekAbility(guestId);
+        };
+
         // Restart game
         this.ui.onRestartGame = () => {
             this.startGame();
@@ -70,6 +74,8 @@ class Game {
 
     startGame() {
         this.gameState.reset();
+        // Pre-select the first guest
+        this.gameState.selectNextGuest();
         this.updateUI();
         this.ui.showPhase('party');
         this.updateWinStreakDisplay();
@@ -85,23 +91,15 @@ class Game {
             return;
         }
 
-        // Get random guest from guest list
-        const guestTemplate = this.gameState.getRandomGuestFromList();
+        // Get the pre-selected next guest
+        const guestTemplate = this.gameState.getNextGuest();
         if (!guestTemplate) {
-            alert('No guests available in guest list!');
+            alert('⚠️ No more guests available to invite!');
             return;
         }
 
         // Create a copy of the guest to add to house
-        // If guestTemplate is already a Guest instance, clone it; otherwise create from key
-        let guestCopy;
-        if (guestTemplate instanceof Object && guestTemplate.id) {
-            // It's already a Guest instance, create a new one from its id
-            guestCopy = createGuest(guestTemplate.id);
-        } else {
-            // It's a key string
-            guestCopy = createGuest(guestTemplate);
-        }
+        const guestCopy = createGuest(guestTemplate.id);
         
         // Add guest to house
         const added = this.gameState.addGuestToHouse(guestCopy);
@@ -114,6 +112,9 @@ class Game {
         
         // Handle effects
         this.handleGuestEffects(effects);
+
+        // Pre-select the next guest for future invitations
+        this.gameState.selectNextGuest();
 
         // Check if house is now full after effects (auto-invites might fill it)
         if (this.gameState.houseGuests.length >= this.gameState.houseCapacity) {
@@ -142,15 +143,12 @@ class Game {
         if (effects.invite && effects.invite.length > 0) {
             effects.invite.forEach(guestToInvite => {
                 if (this.gameState.houseGuests.length < this.gameState.houseCapacity) {
-                    let invitedGuest;
-                    if (guestToInvite instanceof Object && guestToInvite.id) {
-                        invitedGuest = createGuest(guestToInvite.id);
-                    } else {
-                        invitedGuest = createGuest(guestToInvite);
-                    }
+                    const invitedGuest = createGuest(guestToInvite.id || guestToInvite);
                     this.gameState.addGuestToHouse(invitedGuest);
                 }
             });
+            // Re-select next guest after auto-invites
+            this.gameState.selectNextGuest();
         }
 
         // Handle reshuffle
@@ -161,39 +159,84 @@ class Game {
 
         // Handle modifications
         if (effects.modify && effects.modify.length > 0) {
-            effects.modify.forEach(mod => {
-                if (mod.target === 'self') {
-                    // Modify the guest that triggered the ability
-                    // This would need to be tracked
-                } else {
-                    // Modify other guests
-                    const targetGuest = this.gameState.houseGuests.find(g => g.id === mod.target);
-                    if (targetGuest && mod.property) {
-                        targetGuest[mod.property] = (targetGuest[mod.property] || 0) + mod.value;
-                    }
+            // Special handling for dancer synergy - update all dancers
+            const hasDancerSynergy = effects.modify.some(mod => mod.isDancerSynergy);
+            
+            if (hasDancerSynergy) {
+                // Count all dancers in house
+                const dancers = this.gameState.houseGuests.filter(g => g.id === 'dancer');
+                const dancerCount = dancers.length;
+                
+                if (dancerCount > 0) {
+                    // Calculate exponential multiplier: numberOfDancers^2
+                    const multiplier = dancerCount;
+                    
+                    // Update all dancers with exponential values
+                    dancers.forEach(dancer => {
+                        dancer.popularity = multiplier;
+                    });
                 }
-            });
+            } else if (hasComedianSynergy) {
+                // Count all comedians in house
+                const comedians = this.gameState.houseGuests.filter(g => g.id === 'comedian');
+                const comedianCount = comedians.length;
+                
+                if (comedianCount > 0 && isHouseFull) {
+                    // Calculate comedian multiplier
+                    const multiplier = comedianCount * 5;
+                    comedians.forEach(comedian => {
+                        comedian.popularity = multiplier;
+                    });
+                }
+            } else {
+                // Standard modification handling
+                effects.modify.forEach(mod => {
+                    if (mod.target === 'self') {
+                        // Modify the guest that triggered the ability
+                        const triggeringGuest = this.gameState.houseGuests[this.gameState.houseGuests.length - 1];
+                        if (triggeringGuest && mod.property) {
+                            triggeringGuest[mod.property] = (triggeringGuest[mod.property] || 0) + mod.value;
+                        }
+                    } else {
+                        // Modify other guests
+                        const targetGuest = this.gameState.houseGuests.find(g => g.id === mod.target);
+                        if (targetGuest && mod.property) {
+                            targetGuest[mod.property] = (targetGuest[mod.property] || 0) + mod.value;
+                        }
+                    }
+                });
+            }
         }
     }
 
     endPartyPhase(troubleEnded = false) {
-        if (troubleEnded) {
-            // No rewards if trouble ended the party
-            this.gameState.houseGuests = [];
-            // Move to shop phase
-            this.gameState.isPartyPhase = false;
-            this.ui.showPhase('shop');
-            this.updateUI();
-        } else {
-            // Check win condition before ending phase (while guests are still in house)
+        // Check win condition BEFORE trouble check (trouble takes precedence)
+        // Only check win if party ended normally (not due to trouble)
+        if (!troubleEnded) {
             const starCount = this.gameState.getStarCount();
             if (starCount >= 4) {
                 this.endGame(true, 'You hosted the ultimate party!');
                 return;
             }
-            
+        }
+        
+        if (troubleEnded) {
+            // No rewards if trouble ended the party (trouble takes precedence over stars)
+            this.gameState.houseGuests = [];
+            // Move to shop phase with transition
+            this.gameState.isPartyPhase = false;
+            this.ui.showPhase('shop');
+            // Update UI after transition completes
+            setTimeout(() => {
+                this.updateUI();
+            }, 1200);
+        } else {
             // Collect rewards
             const rewards = this.gameState.endPartyPhase();
+            
+            // Animate stats that changed
+            this.ui.animateSpecificStat('popularity', this.gameState.popularity);
+            this.ui.animateSpecificStat('cash', this.gameState.cash);
             
             // Show results tally to user
             this.showResultsTally(rewards);
@@ -208,12 +251,20 @@ class Game {
             `✨ Stars: ${rewards.starCount} / 4\n\n` +
             `Proceeding to shop phase...`;
         
+        // Show alert first
         alert(message);
         
-        // Move to shop phase after showing results
-        this.gameState.isPartyPhase = false;
-        this.ui.showPhase('shop');
-        this.updateUI();
+        // After alert closes, start transition to shop phase
+        // Use setTimeout to ensure alert has fully closed and browser can render
+        setTimeout(() => {
+            this.gameState.isPartyPhase = false;
+            this.ui.showPhase('shop');
+            
+            // Update UI after transition completes
+            setTimeout(() => {
+                this.updateUI();
+            }, 1200);
+        }, 100);
     }
 
     startNextRound() {
@@ -224,17 +275,32 @@ class Game {
         }
 
         this.gameState.startNextRound();
+        // Start transition to party phase
         this.ui.showPhase('party');
-        this.updateUI();
+        // Update UI after transition completes
+        setTimeout(() => {
+            this.updateUI();
+        }, 1500);
     }
 
     buyGuest(guestKey) {
+        // Double-check that purchase is valid (button should be disabled, but safety check)
+        const guestDef = GuestDefinitions[guestKey];
+        if (!guestDef) return;
+        
+        const canPurchase = this.gameState.canPurchaseGuest(guestKey);
+        if (this.gameState.popularity < guestDef.cost || !canPurchase) {
+            // Button should be disabled, but if somehow called, just return silently
+            return;
+        }
+        
         const success = this.gameState.buyGuest(guestKey);
         if (success) {
+            // Animate the specific stat that changed
+            this.ui.animateSpecificStat('popularity', this.gameState.popularity);
             this.updateUI();
-        } else {
-            alert('Not enough popularity!');
         }
+        // No alert - button should never be clickable when disabled
     }
 
     upgradeCapacity() {
@@ -244,6 +310,9 @@ class Game {
         }
         const success = this.gameState.upgradeCapacity();
         if (success) {
+            // Animate the specific stat that changed
+            this.ui.animateSpecificStat('capacity', this.gameState.houseCapacity);
+            this.ui.animateSpecificStat('cash', this.gameState.cash);
             this.updateUI();
         } else {
             alert('Not enough cash!');
@@ -308,6 +377,9 @@ class Game {
             this.gameState.houseGuests.splice(kickIndex, 1);
             // Mark as kicked so they don't appear in pool for this phase
             this.gameState.kickedGuests.push(guestToKick.id);
+            
+            // Re-select next guest in case the pool changed
+            this.gameState.selectNextGuest();
         }
 
         // Check if this causes instant loss
@@ -329,7 +401,7 @@ class Game {
 
     useInviteAbility(guestId) {
         // Find the driver guest
-        const driver = this.gameState.houseGuests.find(g => g.id === guestId && g.id === 'driver');
+        const driver = this.gameState.houseGuests.find(g => g.id === 'driver' && g.id === guestId);
         if (!driver) {
             return;
         }
@@ -378,6 +450,9 @@ class Game {
         // Execute guest abilities
         const effects = invitedGuest.executeAbilities(this.gameState, this.gameState.houseGuests);
         this.handleGuestEffects(effects);
+        
+        // Pre-select the next guest for future invitations
+        this.gameState.selectNextGuest();
 
         // Check if house is now full
         if (this.gameState.houseGuests.length >= this.gameState.houseCapacity) {
@@ -396,6 +471,44 @@ class Game {
             }, 100);
         }
 
+        this.updateUI();
+    }
+
+    usePeekAbility(instanceId) {
+        // Find the specific guest instance by instanceId
+        const watchdog = this.gameState.houseGuests.find(g => g.instanceId === instanceId);
+        if (!watchdog || watchdog.id !== 'watchdog') {
+            return;
+        }
+        
+        // Check if this specific instance has already used the ability
+        if (this.gameState.hasInstanceUsedAbility(watchdog.instanceId, 'peek')) {
+            return; // Button should be disabled, but just in case
+        }
+
+        // Mark ability as used for this specific instance
+        this.gameState.markInstanceAbilityUsed(watchdog.instanceId, 'peek');
+
+        // Get the pre-selected next guest
+        const nextGuest = this.gameState.getNextGuest();
+        
+        if (!nextGuest) {
+            alert('⚠️ No more guests available to peek at!\n\nThe guest pool is empty.');
+            return;
+        }
+
+        // Show the next guest information
+        const guestInfo = `Next Guest Preview:\n\n` +
+            `Name: ${nextGuest.name}\n` +
+            `⭐ Popularity: ${nextGuest.popularity || 0}\n` +
+            `💰 Cash: ${nextGuest.cash || 0}\n` +
+            `${nextGuest.trouble > 0 ? `⚠️ Trouble: ${nextGuest.trouble}\n` : ''}` +
+            `${nextGuest.star > 0 ? `✨ Star: ${nextGuest.star}\n` : ''}` +
+            `${nextGuest.description ? `\n${nextGuest.description}` : ''}`;
+        
+        alert(guestInfo);
+        
+        // Update UI to disable the button for this specific guest
         this.updateUI();
     }
 
@@ -462,12 +575,18 @@ class Game {
         // Update capacity display
         this.ui.elements.maxCapacityDisplay.textContent = this.gameState.houseCapacity;
         
-        // Update door button state - check if there are available guests
-        const availableGuests = this.gameState.getAvailableGuests();
+        // Update door button state - check if there are available guests and next guest is selected
         const canInvite = this.gameState.houseGuests.length < this.gameState.houseCapacity && 
-                         availableGuests.length > 0 &&
+                         this.gameState.hasMoreGuests() &&
                          this.gameState.isPartyPhase;
         this.ui.updateDoorButton(canInvite);
+        
+        // Update door button text to show if no more guests
+        if (this.gameState.isPartyPhase && !this.gameState.hasMoreGuests()) {
+            this.ui.updateDoorButtonText('⚠️ No More Guests');
+        } else if (this.gameState.isPartyPhase) {
+            this.ui.updateDoorButtonText('🎪 Open Door');
+        }
         
         // Update shop if in shop phase
         if (!this.gameState.isPartyPhase) {

@@ -44,6 +44,11 @@ export class Guest {
                     this.applySynergy(houseGuests, ability, effects);
                     break;
                 
+                case 'dancerSynergy':
+                    // Special exponential dancer synergy
+                    this.applySynergy(houseGuests, ability, effects);
+                    break;
+                
                 case 'reshuffle':
                     // Reshuffle current configuration
                     effects.reshuffle = true;
@@ -80,7 +85,16 @@ export class Guest {
     }
 
     applySynergy(houseGuests, ability, effects) {
-        // Find guests that match synergy criteria
+        // Special case for dancer synergy (exponential scaling)
+        if (ability.type === 'dancerSynergy') {
+            // Mark this as dancer synergy for special handling
+            effects.modify.push({
+                isDancerSynergy: true
+            });
+            return;
+        }
+        
+        // Standard synergy logic
         const matchingGuests = houseGuests.filter(g => {
             if (ability.withType) {
                 return g.type === ability.withType;
@@ -118,20 +132,6 @@ export class Guest {
         }
     }
 
-    /**
-     * Get display information for the guest
-     */
-    getDisplayInfo() {
-        return {
-            name: this.name,
-            popularity: this.popularity,
-            cash: this.cash,
-            trouble: this.trouble,
-            star: this.star,
-            type: this.type,
-            description: this.description
-        };
-    }
 }
 
 /**
@@ -141,9 +141,9 @@ export const GuestDefinitions = {
     // Basic Guests
     basic: {
         id: 'basic',
-        name: 'Party Guest',
+        name: 'Old Friend',
         popularity: 1,
-        cash: 1,
+        cash: 0,
         trouble: 0,
         star: 0,
         type: 'basic',
@@ -151,25 +151,63 @@ export const GuestDefinitions = {
         description: 'A basic party guest'
     },
 
+    // Basic Guests
+    rich: {
+        id: 'rich',
+        name: 'Rich Friend',
+        popularity: 0,
+        cash: 1,
+        trouble: 0,
+        star: 0,
+        type: 'basic',
+        cost: 3,
+        description: 'A rich guest'
+    },
+
     // Star Guests
     star: {
-        id: 'star',
-        name: 'Star Guest',
-        popularity: 2,
-        cash: 2,
+        id: 'superstar',
+        name: 'Superstar',
+        popularity: 3,
+        cash: 0,
         trouble: 0,
         star: 1,
         type: 'star',
-        cost: 5,
-        description: 'A celebrity guest!'
+        cost: 45,
+        description: 'A superstar guest!'
     },
+
+    alien: {
+        id: 'alien',
+        name: 'Alien',
+        popularity: 0,
+        cash: 0,
+        trouble: 0,
+        star: 1,
+        type: 'star',
+        cost: 35,
+        description: 'An alien!!!'
+    },
+
+    dinosaur: {
+        id: 'dinosaur',
+        name: 'Dinosaur',
+        popularity: 0,
+        cash: 0,
+        trouble: 1,
+        star: 1,
+        type: 'star',
+        cost: 25,
+        description: 'Rawr! A dinosaur!!!'
+    },
+
 
     // Trouble Guests
     troublemaker: {
         id: 'troublemaker',
         name: 'Troublemaker',
-        popularity: 3,
-        cash: 3,
+        popularity: 2,
+        cash: 0,
         trouble: 1,
         star: 0,
         type: 'trouble',
@@ -177,50 +215,70 @@ export const GuestDefinitions = {
         description: 'Causes trouble at parties'
     },
 
-    // Synergy Guests
-    musician: {
-        id: 'musician',
-        name: 'Musician',
-        popularity: 2,
-        cash: 1,
-        trouble: 0,
+    rockstar: {
+        id: 'rockstar',
+        name: 'Rockstar',
+        popularity: 3,
+        cash: 2,
+        trouble: 1,
         star: 0,
-        type: 'musician',
-        cost: 4,
-        description: 'Plays great music',
-        abilities: [{
-            type: 'synergy',
-            withType: 'dancer',
-            bonus: { property: 'popularity', value: 1 }
-        }]
+        type: 'trouble',
+        cost: 5,
+        description: 'Rock on!'
     },
 
+    monkey: {
+        id: 'monkey',
+        name: 'Monkey',
+        popularity: 4,
+        cash: 0,
+        trouble: 1,
+        star: 0,
+        type: 'trouble',
+        cost: 5,
+        description: 'Some real monkey business!'
+    },
+
+    // Synergy Guests
     dancer: {
         id: 'dancer',
         name: 'Dancer',
         popularity: 1,
-        cash: 2,
+        cash: 0,
         trouble: 0,
         star: 0,
         type: 'dancer',
         cost: 4,
-        description: 'Loves to dance',
+        description: 'Loves to dance - Value increases exponentially with more dancers!',
         abilities: [{
-            type: 'synergy',
-            withType: 'musician',
-            bonus: { property: 'cash', value: 1 }
+            type: 'dancerSynergy'
+        }]
+    },
+
+    comedian: {
+        id: 'comedian',
+        name: 'Comedian',
+        popularity: 0,
+        cash: -1,
+        trouble: 0,
+        star: 0,
+        type: 'comedian',
+        cost: 4,
+        description: 'If house is full at end of round, becomes 5 Pop',
+        abilities: [{
+            type: 'comedianSynergy'
         }]
     },
 
     // Auto-invite Guests
     socialite: {
-        id: 'socialite',
-        name: 'Socialite',
+        id: 'celebrity',
+        name: 'Celebrity',
         popularity: 1,
-        cash: 1,
+        cash: 2,
         trouble: 0,
         star: 0,
-        type: 'socialite',
+        type: 'celebrity',
         cost: 6,
         description: 'Invites friends automatically',
         abilities: [{
@@ -246,45 +304,32 @@ export const GuestDefinitions = {
     },
 
     // High Value Guests
-    celebrity: {
-        id: 'celebrity',
-        name: 'Celebrity',
-        popularity: 4,
-        cash: 4,
-        trouble: 0,
-        star: 1,
-        type: 'celebrity',
-        cost: 10,
-        description: 'A famous celebrity!'
-    },
 
-    // Cash Generator
-    investor: {
-        id: 'investor',
-        name: 'Investor',
-        popularity: 1,
-        cash: 5,
+    auctioneer: {
+        id: 'auctioneer',
+        name: 'Auctioneer',
+        popularity: 0,
+        cash: 3,
         trouble: 0,
         star: 0,
-        type: 'investor',
-        cost: 8,
+        type: 'auctioneer',
+        cost: 9,
         description: 'Brings lots of cash'
     },
 
-    // Popularity Generator
     influencer: {
         id: 'influencer',
         name: 'Influencer',
-        popularity: 5,
+        popularity: 3,
         cash: 1,
         trouble: 0,
         star: 0,
         type: 'influencer',
-        cost: 9,
+        cost: 6,
         description: 'Very popular on social media'
     },
 
-    // New Guest Types
+    // Trouble Mitigation Guests
     dog: {
         id: 'dog',
         name: 'Dog',
@@ -300,6 +345,7 @@ export const GuestDefinitions = {
         }]
     },
 
+    // Ability Guests
     grillmaster: {
         id: 'grillmaster',
         name: 'Grillmaster',
@@ -323,7 +369,7 @@ export const GuestDefinitions = {
         trouble: 0,
         star: 0,
         type: 'bouncer',
-        cost: 3,
+        cost: 4,
         description: 'Kick: Remove a guest from the party',
         abilities: [{
             type: 'kick'
@@ -343,7 +389,23 @@ export const GuestDefinitions = {
         abilities: [{
             type: 'manualInvite'
         }]
-    }
+    },
+
+    watchdog: {
+        id: 'watchdog',
+        name: 'Watchdog',
+        popularity: 2,
+        cash: 0,
+        trouble: 0,
+        star: 0,
+        type: 'watchdog',
+        cost: 6,
+        description: 'Peek: View what the next guest will be',
+        abilities: [{
+            type: 'peek'
+        }]
+    },
+
 };
 
 /**
@@ -355,14 +417,5 @@ export function createGuest(definitionKey) {
         throw new Error(`Guest definition not found: ${definitionKey}`);
     }
     return new Guest(definition);
-}
-
-/**
- * Get random guest from available pool
- */
-export function getRandomGuest(availableGuests) {
-    if (availableGuests.length === 0) return null;
-    const randomIndex = Math.floor(Math.random() * availableGuests.length);
-    return availableGuests[randomIndex];
 }
 
