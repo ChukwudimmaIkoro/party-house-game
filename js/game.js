@@ -54,12 +54,12 @@ class Game {
             this.useReshuffleAbility(guestId);
         };
 
-        this.ui.onUseKick = (guestId) => {
-            this.useKickAbility(guestId);
+        this.ui.onUseKick = (instanceId) => {
+            this.useKickAbility(instanceId);
         };
 
-        this.ui.onUseInvite = (guestId) => {
-            this.useInviteAbility(guestId);
+        this.ui.onUseInvite = (instanceId) => {
+            this.useInviteAbility(instanceId);
         };
 
         this.ui.onUsePeek = (guestId) => {
@@ -298,6 +298,14 @@ class Game {
         if (success) {
             // Animate the specific stat that changed
             this.ui.animateSpecificStat('popularity', this.gameState.popularity);
+            
+            // Show +1 popup on the shop item
+            const shopItem = document.querySelector(`[data-guest-key="${guestKey}"]`);
+            if (shopItem) {
+                const isStar = guestDef.star > 0;
+                this.ui.showPlusOnePopup(shopItem, 'yellow', isStar);
+            }
+            
             this.updateUI();
         }
         // No alert - button should never be clickable when disabled
@@ -313,6 +321,12 @@ class Game {
             // Animate the specific stat that changed
             this.ui.animateSpecificStat('capacity', this.gameState.houseCapacity);
             this.ui.animateSpecificStat('cash', this.gameState.cash);
+            
+            // Show +1 popup on the upgrade button
+            if (this.ui.elements.upgradeCapacityBtn) {
+                this.ui.showPlusOnePopup(this.ui.elements.upgradeCapacityBtn, 'green', false);
+            }
+            
             this.updateUI();
         } else {
             alert('Not enough cash!');
@@ -340,15 +354,20 @@ class Game {
         this.updateUI();
     }
 
-    useKickAbility(guestId) {
-        // Find the bouncer guest
-        const bouncer = this.gameState.houseGuests.find(g => g.id === guestId && g.id === 'bouncer');
-        if (!bouncer) {
+    useKickAbility(instanceId) {
+        // Find the specific bouncer guest instance by instanceId
+        const bouncer = this.gameState.houseGuests.find(g => g.instanceId === instanceId);
+        if (!bouncer || bouncer.id !== 'bouncer') {
             return;
+        }
+        
+        // Check if this specific instance has already used the ability
+        if (this.gameState.hasInstanceUsedAbility(bouncer.instanceId, 'kick')) {
+            return; // Button should be disabled, but just in case
         }
 
         // Get list of other guests (can't kick self)
-        const otherGuests = this.gameState.houseGuests.filter(g => g.id !== guestId);
+        const otherGuests = this.gameState.houseGuests.filter(g => g.instanceId !== instanceId);
         if (otherGuests.length === 0) {
             alert('No other guests to kick!');
             return;
@@ -368,10 +387,12 @@ class Game {
 
         const guestToKick = otherGuests[index];
         
+        // Mark ability as used for this specific instance
+        this.gameState.markInstanceAbilityUsed(bouncer.instanceId, 'kick');
+        
         // Remove guest from house (they don't go back to pool for this phase)
         const kickIndex = this.gameState.houseGuests.findIndex(g => 
-            g.id === guestToKick.id && 
-            g.name === guestToKick.name
+            g.instanceId === guestToKick.instanceId
         );
         if (kickIndex !== -1) {
             this.gameState.houseGuests.splice(kickIndex, 1);
@@ -399,11 +420,16 @@ class Game {
         this.updateUI();
     }
 
-    useInviteAbility(guestId) {
-        // Find the driver guest
-        const driver = this.gameState.houseGuests.find(g => g.id === 'driver' && g.id === guestId);
-        if (!driver) {
+    useInviteAbility(instanceId) {
+        // Find the specific driver guest instance by instanceId
+        const driver = this.gameState.houseGuests.find(g => g.instanceId === instanceId);
+        if (!driver || driver.id !== 'driver') {
             return;
+        }
+        
+        // Check if this specific instance has already used the ability
+        if (this.gameState.hasInstanceUsedAbility(driver.instanceId, 'manualInvite')) {
+            return; // Button should be disabled, but just in case
         }
 
         // Check if house is full
@@ -437,6 +463,9 @@ class Game {
         }
 
         const guestToInvite = availableGuests[index];
+        
+        // Mark ability as used for this specific instance
+        this.gameState.markInstanceAbilityUsed(driver.instanceId, 'manualInvite');
         
         // Create a copy and add to house
         const invitedGuest = createGuest(guestToInvite.id);
