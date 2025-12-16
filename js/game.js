@@ -220,6 +220,25 @@ class Game {
             }
         }
         
+        // Check lose condition: if it's round 25 and player didn't win, game ends
+        if (this.gameState.currentRound >= this.gameState.maxRounds) {
+            if (!troubleEnded) {
+                // Collect rewards first (for final round)
+                const rewards = this.gameState.endPartyPhase();
+                
+                // Animate stats that changed
+                this.ui.animateSpecificStat('popularity', this.gameState.popularity);
+                this.ui.animateSpecificStat('cash', this.gameState.cash);
+            } else {
+                // No rewards if trouble ended the party
+                this.gameState.houseGuests = [];
+            }
+            
+            // Game over - didn't reach 4 stars within 25 rounds
+            this.endGame(false, `Game Over! You didn't reach 4 star guests within 25 rounds.`);
+            return;
+        }
+        
         if (troubleEnded) {
             // No rewards if trouble ended the party (trouble takes precedence over stars)
             this.gameState.houseGuests = [];
@@ -268,12 +287,8 @@ class Game {
     }
 
     startNextRound() {
-        // Check lose condition
-        if (this.gameState.checkLoseCondition()) {
-            this.endGame(false, `Game Over! You didn't reach 4 star guests within 25 rounds.`);
-            return;
-        }
-
+        // Lose condition is now checked in endPartyPhase after round 25
+        // This function should only be called if we haven't reached the max rounds yet
         this.gameState.startNextRound();
         // Start transition to party phase
         this.ui.showPhase('party');
