@@ -34,7 +34,7 @@ The game includes various guest types with unique attributes:
 - **Basic Guests**: Standard party guests (don't take them for granted)
 - **Star Guests**: Required for victory!
 - **Trouble Guests**: Guests that are often high value, but beware! If three are in your party at the same time, the round automatically ends without earning anything!
-- **Synergy Guests**: Guests that provide bonus Popularity/Cash when combined with another mechanic/guest (Dancers, Comedians, etc)
+- **Conditional Guests**: Guests that provide bonus Popularity/Cash when under certain conditions (Dancers, Comedians, etc)
 - **Passive-Ability Guests**: Guests that provide an effect as long as they are currently present at your party
 - **Auto-Ability Guests**: Guests that automatically trigger an effect upon arrival
 - **Manual-Ability Guests**: Guests that have an ability that can be triggered by the player at any time during the round
