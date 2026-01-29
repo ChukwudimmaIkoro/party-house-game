@@ -2,6 +2,8 @@
 
 A JavaScript-based deckbuilder game inspired by Party House from UFO 50!
 
+![til](./gifs/partyhousegifmain.gif)
+
 ## Game Overview
 
 Host the ultimate party by gathering guests into your house. Your goal is to host a party with 4 star guests within 25 rounds!
@@ -15,6 +17,8 @@ The game occurs over 25 rounds, and each round consists of two phases:
    - Each guest has different values, whether it be Popularity, Cash, or Trouble. Some guests also have unique effects.
    - If 3 troubles are in the house at once, the party ends immediately and you lose all potential earnings for the round!
    - Try to fill your house or maximize rewards before ending the round, will you risk the reward?
+  
+   ![til](./gifs/partyhousegifloss.gif)
 
 2. **Shop Phase**:
    - Use the Popularity you earn to add new guests to your guest list
